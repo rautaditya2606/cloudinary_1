@@ -1,4 +1,4 @@
-/* Mobile-first responsive design */
+/* Mobile-first responsive design with ultra-fast performance */
 * {
   box-sizing: border-box;
 }
@@ -11,6 +11,9 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Performance optimizations */
+  will-change: scroll-position;
+  contain: layout style paint;
 }
 
 /* Header - Mobile optimized */
@@ -62,26 +65,32 @@ main {
   padding: 0 1rem;
 }
 
-/* Gallery - Mobile optimized grid */
+/* Gallery - Ultra-fast mobile optimized grid */
 .gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
   padding: 0.5rem 0;
+  /* Performance optimizations */
+  contain: layout style;
+  will-change: transform;
 }
 
-/* Media items - Touch friendly */
+/* Media items - Ultra-fast touch friendly */
 .media-item {
   background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease;
   cursor: pointer;
   position: relative;
-  min-height: 200px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
+  /* Performance optimizations */
+  contain: layout style paint;
+  will-change: transform;
 }
 
 .media-item:hover {

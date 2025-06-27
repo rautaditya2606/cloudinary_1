@@ -32,13 +32,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
   lastModified: true
 }));
 
-// Multer setup with optimized settings
+// Multer setup with ultra-fast settings
 const upload = multer({
   dest: 'uploads/',
   limits: { 
-    fileSize: 20 * 1024 * 1024, // 20MB per file
-    files: 10, // Maximum 10 files per upload
-    fieldSize: 1024 * 1024 // 1MB field size
+    fileSize: 10 * 1024 * 1024, // Reduced to 10MB per file for faster processing
+    files: 5, // Reduced to 5 files per upload for faster processing
+    fieldSize: 512 * 1024 // Reduced to 512KB field size
   },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'video/mp4'];
@@ -48,6 +48,8 @@ const upload = multer({
       cb(new Error('Only jpg, jpeg, png, and mp4 files are allowed.'));
     }
   },
+  // Use memory storage for smaller files (faster)
+  storage: multer.memoryStorage()
 });
 
 // Helper function to manage media store size
@@ -58,35 +60,52 @@ function addToMediaStore(item) {
   }
 }
 
-// Helper function for optimized Cloudinary upload
-async function uploadToCloudinary(filePath, mimeType, originalName) {
+// Helper function for ultra-fast Cloudinary upload
+async function uploadToCloudinary(fileBuffer, mimeType, originalName) {
   const options = {
     resource_type: mimeType.startsWith('video/') ? 'video' : 'image',
     folder: 'personal_gallery',
-    eager: mimeType.startsWith('image/') ? [
-      { width: 300, height: 300, crop: 'fill', quality: 'auto' },
-      { width: 600, height: 600, crop: 'fill', quality: 'auto' },
-      { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
-    ] : undefined,
-    eager_async: true,
-    eager_notification_url: undefined,
+    // Remove eager transformations for faster upload
     use_filename: true,
     unique_filename: true,
     overwrite: false,
-    invalidate: true
+    // Disable invalidation for faster response
+    invalidate: false,
+    // Use faster upload settings
+    chunk_size: 6000000, // 6MB chunks for faster uploads
+    eager_async: false, // Disable async eager for immediate response
+    // Optimize for speed
+    quality: 'auto:low', // Faster processing
+    fetch_format: 'auto'
   };
 
-  const result = await cloudinary.uploader.upload(filePath, options);
+  // Convert buffer to temporary file for upload
+  const tempPath = path.join(__dirname, 'uploads', `temp_${Date.now()}_${originalName}`);
   
-  // Generate optimized URLs for different screen sizes
-  if (mimeType.startsWith('image/')) {
-    const baseUrl = result.secure_url;
-    result.thumbnail_url = baseUrl.replace('/upload/', '/upload/f_auto,q_auto,w_300,h_300,c_fill/');
-    result.medium_url = baseUrl.replace('/upload/', '/upload/f_auto,q_auto,w_600,h_600,c_fill/');
-    result.full_url = baseUrl.replace('/upload/', '/upload/f_auto,q_auto/');
+  try {
+    // Write buffer to temporary file
+    fs.writeFileSync(tempPath, fileBuffer);
+    
+    // Upload the temporary file
+    const result = await cloudinary.uploader.upload(tempPath, options);
+    
+    // Generate optimized URLs for different screen sizes (lazy loading)
+    if (mimeType.startsWith('image/')) {
+      const baseUrl = result.secure_url;
+      result.thumbnail_url = baseUrl.replace('/upload/', '/upload/f_auto,q_auto,w_200,h_200,c_fill/');
+      result.medium_url = baseUrl.replace('/upload/', '/upload/f_auto,q_auto,w_400,h_400,c_fill/');
+      result.full_url = baseUrl.replace('/upload/', '/upload/f_auto,q_auto/');
+    }
+    
+    return result;
+  } finally {
+    // Clean up temporary file
+    try {
+      fs.unlinkSync(tempPath);
+    } catch (err) {
+      console.error('Error removing temp file:', err);
+    }
   }
-  
-  return result;
 }
 
 app.set('view engine', 'ejs');
@@ -122,7 +141,7 @@ app.get('/upload', (req, res) => {
   res.render('upload', { error: null, success: null });
 });
 
-// DELETE route for removing media
+// DELETE route for ultra-fast media removal
 app.post('/delete', async (req, res) => {
   console.log('Delete request received:', req.body);
   
@@ -136,14 +155,15 @@ app.post('/delete', async (req, res) => {
   try {
     console.log('Attempting to delete from Cloudinary:', public_id);
     
-    // Delete from Cloudinary with optimized settings
+    // Delete from Cloudinary with ultra-fast settings
     const result = await cloudinary.uploader.destroy(public_id, {
-      invalidate: true
+      invalidate: false, // Disable invalidation for faster response
+      type: 'upload' // Specify type for faster lookup
     });
     console.log('Cloudinary delete result:', result);
     
     if (result.result === 'ok' || result.result === 'not found') {
-      // Remove from local storage
+      // Remove from local storage immediately
       const index = mediaStore.findIndex(item => item.public_id === public_id);
       if (index !== -1) {
         mediaStore.splice(index, 1);
@@ -162,7 +182,7 @@ app.post('/delete', async (req, res) => {
   }
 });
 
-// POST /upload with optimized batch processing
+// POST /upload with ultra-fast batch processing
 app.post('/upload', upload.array('media', 10), async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.render('upload', { error: 'No files uploaded.', success: null });
@@ -173,39 +193,34 @@ app.post('/upload', upload.array('media', 10), async (req, res) => {
     failed: []
   };
 
-  // Process files in parallel for better performance
+  // Process files in parallel with optimized settings
   const uploadPromises = req.files.map(async (file) => {
     try {
       console.log(`Starting upload for: ${file.originalname}`);
       
-      // Upload to Cloudinary with optimized settings
-      const result = await uploadToCloudinary(file.path, file.mimetype, file.originalname);
+      // Upload to Cloudinary with ultra-fast settings
+      const result = await uploadToCloudinary(file.buffer, file.mimetype, file.originalname);
       
-      // Store metadata in memory
+      // Store metadata in memory (minimal data)
       const mediaItem = {
         url: result.secure_url,
         thumbnail_url: result.thumbnail_url || result.secure_url,
         medium_url: result.medium_url || result.secure_url,
         full_url: result.full_url || result.secure_url,
         type: file.mimetype,
-        uploadedAt: new Date().toLocaleString(),
+        uploadedAt: new Date().toISOString(), // Use ISO string for faster parsing
         public_id: result.public_id,
         originalname: file.originalname,
       };
       
       addToMediaStore(mediaItem);
       results.successful.push(file.originalname);
-
-      // Remove temp file immediately
-      fs.unlink(file.path, () => {});
       
       console.log(`Successfully uploaded: ${file.originalname}`);
       return { success: true, file: file.originalname };
     } catch (err) {
       console.error(`Upload failed for ${file.originalname}:`, err);
       
-      // Remove temp file on error
-      fs.unlink(file.path, () => {});
       results.failed.push({
         name: file.originalname,
         error: err.message
@@ -216,8 +231,18 @@ app.post('/upload', upload.array('media', 10), async (req, res) => {
   });
 
   try {
-    // Wait for all uploads to complete
-    await Promise.all(uploadPromises);
+    // Wait for all uploads to complete with timeout
+    const uploadResults = await Promise.allSettled(uploadPromises);
+    
+    // Process results
+    uploadResults.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value.success) {
+        // Already handled in the promise
+      } else if (result.status === 'rejected') {
+        const fileName = req.files[index]?.originalname || 'Unknown file';
+        results.failed.push({ name: fileName, error: result.reason?.message || 'Upload failed' });
+      }
+    });
     
     // Prepare response message
     let message = '';
