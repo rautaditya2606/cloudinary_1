@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="format-detection" content="telephone=no">
   <title>My Media Gallery</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -23,7 +27,7 @@
         <div class="media-item">
           <div class="media-content" onclick="openModal(<%= index %>)">
             <% if (item.type.startsWith('image/')) { %>
-              <img src="<%= item.url %>" alt="<%= item.originalname %>" />
+              <img src="<%= item.url %>" alt="<%= item.originalname %>" loading="lazy" />
             <% } else if (item.type === 'video/mp4') { %>
               <video src="<%= item.url %>" preload="metadata"></video>
             <% } %>
@@ -93,6 +97,9 @@
       `;
       
       modal.style.display = 'block';
+      
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
     }
     
     function closeModal() {
@@ -100,6 +107,9 @@
       const modalVideo = document.getElementById('modalVideo');
       modal.style.display = 'none';
       modalVideo.pause();
+      
+      // Restore body scroll
+      document.body.style.overflow = 'auto';
     }
 
     function confirmDelete(publicId, fileName, event) {
@@ -107,11 +117,17 @@
       deletePublicId = publicId;
       document.getElementById('deleteFileName').textContent = fileName;
       document.getElementById('deleteModal').style.display = 'block';
+      
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
     }
 
     function closeDeleteModal() {
       document.getElementById('deleteModal').style.display = 'none';
       deletePublicId = null;
+      
+      // Restore body scroll
+      document.body.style.overflow = 'auto';
     }
 
     async function deleteMedia() {
@@ -161,6 +177,16 @@
         closeDeleteModal();
       }
     });
+    
+    // Prevent zoom on double tap (mobile)
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
   </script>
 </body>
 </html> 
