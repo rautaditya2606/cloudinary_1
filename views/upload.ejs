@@ -8,6 +8,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="format-detection" content="telephone=no">
   <title>Upload Media</title>
+  
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/styles.css" as="style">
+  <link rel="dns-prefetch" href="//res.cloudinary.com">
+  <link rel="preconnect" href="//res.cloudinary.com">
+  
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -35,6 +41,9 @@
   </main>
 
   <script>
+    'use strict';
+    
+    // Cache DOM elements for better performance
     const fileInput = document.getElementById('media');
     const fileInfo = document.getElementById('fileInfo');
     const submitBtn = document.getElementById('submitBtn');
@@ -42,82 +51,114 @@
     const progressBar = document.getElementById('progressBar');
     const uploadStatus = document.getElementById('uploadStatus');
     const form = document.getElementById('uploadForm');
+    
+    let uploadInProgress = false;
+    let progressInterval = null;
 
-    fileInput.addEventListener('change', function() {
-      const files = Array.from(this.files);
-      if (files.length > 0) {
-        let totalSize = 0;
-        let validFiles = 0;
-        let invalidFiles = 0;
-        
-        const fileDetails = files.map(file => {
-          const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-          totalSize += file.size;
-          const isValidType = ['image/jpeg', 'image/png', 'video/mp4'].includes(file.type);
-          const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB per file
-          
-          if (isValidType && isValidSize) {
-            validFiles++;
-          } else {
-            invalidFiles++;
-          }
-          
-          return {
-            name: file.name,
-            size: sizeMB,
-            type: file.type,
-            valid: isValidType && isValidSize
-          };
-        });
+    // Debounce function for performance
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
 
-        const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-        
-        fileInfo.innerHTML = `
-          <strong>${files.length} file(s) selected</strong><br>
-          Total size: ${totalSizeMB} MB<br>
-          Valid files: ${validFiles}<br>
-          Invalid files: ${invalidFiles}<br><br>
-          <strong>File details:</strong><br>
-          ${fileDetails.map(file => 
-            `${file.name} (${file.size} MB) - ${file.valid ? '✅ Valid' : '❌ Invalid'}`
-          ).join('<br>')}
-        `;
-        fileInfo.style.display = 'block';
-
-        if (invalidFiles > 0) {
-          fileInfo.innerHTML += '<br><span style="color: #c00;">❌ Some files are invalid (wrong type or >20MB)</span>';
-          submitBtn.disabled = true;
-        } else if (totalSize > 100 * 1024 * 1024) { // 100MB total limit
-          fileInfo.innerHTML += '<br><span style="color: #c00;">❌ Total size too large (max 100MB)</span>';
-          submitBtn.disabled = true;
-        } else {
-          fileInfo.innerHTML += '<br><span style="color: #0a0;">✅ All files valid</span>';
-          submitBtn.disabled = false;
-        }
-      } else {
+    // Optimized file validation
+    const validateFiles = debounce(function() {
+      const files = Array.from(fileInput.files);
+      if (files.length === 0) {
         fileInfo.style.display = 'none';
         submitBtn.disabled = false;
+        return;
       }
-    });
+      
+      let totalSize = 0;
+      let validFiles = 0;
+      let invalidFiles = 0;
+      
+      const fileDetails = files.map(file => {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        totalSize += file.size;
+        const isValidType = ['image/jpeg', 'image/png', 'video/mp4'].includes(file.type);
+        const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB per file
+        
+        if (isValidType && isValidSize) {
+          validFiles++;
+        } else {
+          invalidFiles++;
+        }
+        
+        return {
+          name: file.name,
+          size: sizeMB,
+          type: file.type,
+          valid: isValidType && isValidSize
+        };
+      });
 
-    form.addEventListener('submit', function() {
+      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+      
+      fileInfo.innerHTML = `
+        <strong>${files.length} file(s) selected</strong><br>
+        Total size: ${totalSizeMB} MB<br>
+        Valid files: ${validFiles}<br>
+        Invalid files: ${invalidFiles}<br><br>
+        <strong>File details:</strong><br>
+        ${fileDetails.map(file => 
+          `${file.name} (${file.size} MB) - ${file.valid ? '✅ Valid' : '❌ Invalid'}`
+        ).join('<br>')}
+      `;
+      fileInfo.style.display = 'block';
+
+      if (invalidFiles > 0) {
+        fileInfo.innerHTML += '<br><span style="color: #c00;">❌ Some files are invalid (wrong type or >20MB)</span>';
+        submitBtn.disabled = true;
+      } else if (totalSize > 100 * 1024 * 1024) { // 100MB total limit
+        fileInfo.innerHTML += '<br><span style="color: #c00;">❌ Total size too large (max 100MB)</span>';
+        submitBtn.disabled = true;
+      } else {
+        fileInfo.innerHTML += '<br><span style="color: #0a0;">✅ All files valid</span>';
+        submitBtn.disabled = false;
+      }
+    }, 300);
+
+    fileInput.addEventListener('change', validateFiles);
+
+    // Optimized form submission
+    form.addEventListener('submit', function(e) {
+      if (uploadInProgress) {
+        e.preventDefault();
+        return;
+      }
+      
       const files = fileInput.files;
+      if (files.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      
+      uploadInProgress = true;
       submitBtn.disabled = true;
       submitBtn.textContent = 'Uploading...';
       progress.style.display = 'block';
       uploadStatus.style.display = 'block';
       uploadStatus.innerHTML = `<strong>Uploading ${files.length} files...</strong>`;
       
-      // Simulate progress for multiple files
+      // Simulate progress for multiple files with better performance
       let width = 0;
-      const interval = setInterval(() => {
+      progressInterval = setInterval(() => {
         if (width >= 90) {
-          clearInterval(interval);
+          clearInterval(progressInterval);
         } else {
-          width += Math.random() * 5;
+          width += Math.random() * 3 + 1; // More realistic progress
           progressBar.style.width = width + '%';
         }
-      }, 300);
+      }, 200);
     });
     
     // Prevent zoom on double tap (mobile)
@@ -129,6 +170,21 @@
       }
       lastTouchEnd = now;
     }, false);
+    
+    // Performance monitoring
+    window.addEventListener('load', () => {
+      if ('performance' in window) {
+        const perfData = performance.getEntriesByType('navigation')[0];
+        console.log('Upload page load time:', perfData.loadEventEnd - perfData.loadEventStart, 'ms');
+      }
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    });
   </script>
 </body>
 </html> 

@@ -103,36 +103,6 @@ main {
   background: #f1f3f4;
 }
 
-/* Media actions - Always visible on mobile */
-.media-actions {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 1; /* Always visible on mobile */
-  transition: opacity 0.2s;
-}
-
-.delete-btn {
-  background: rgba(220, 53, 69, 0.9);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 0.8rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-height: 36px;
-  min-width: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.delete-btn:hover, .delete-btn:active {
-  background: rgba(220, 53, 69, 1);
-  transform: scale(1.05);
-}
-
 .meta {
   padding: 0.75rem;
   font-size: 0.8rem;
@@ -444,14 +414,6 @@ main {
     height: 200px;
   }
   
-  .media-actions {
-    opacity: 0;
-  }
-  
-  .media-item:hover .media-actions {
-    opacity: 1;
-  }
-  
   .upload-form {
     max-width: 700px;
   }
@@ -470,15 +432,6 @@ main {
 
 /* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
-  .media-actions {
-    opacity: 1;
-  }
-  
-  .delete-btn {
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
-  }
-  
   .upload-form button {
     padding: 1.2rem 1.5rem;
   }
@@ -488,4 +441,31 @@ main {
     height: 48px;
     font-size: 2.2rem;
   }
+}
+
+/* Modal actions - Delete button in modal */
+.modal-actions {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  z-index: 1002;
+}
+
+.modal-delete-btn {
+  background: rgba(220, 53, 69, 0.9);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.modal-delete-btn:hover, .modal-delete-btn:active {
+  background: rgba(220, 53, 69, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
 } 

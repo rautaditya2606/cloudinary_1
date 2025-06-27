@@ -8,7 +8,24 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="format-detection" content="telephone=no">
   <title>My Media Gallery</title>
+  
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/styles.css" as="style">
+  <link rel="dns-prefetch" href="//res.cloudinary.com">
+  <link rel="preconnect" href="//res.cloudinary.com">
+  
   <link rel="stylesheet" href="/styles.css">
+  
+  <!-- Inline critical CSS for above-the-fold content -->
+  <style>
+    .loading { opacity: 0; transition: opacity 0.3s; }
+    .loaded { opacity: 1; }
+    .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
+    @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .media-content { position: relative; }
+    .media-placeholder { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #f1f3f4; display: flex; align-items: center; justify-content: center; }
+    .media-placeholder img { width: 40px; height: 40px; opacity: 0.5; }
+  </style>
 </head>
 <body>
   <header>
@@ -19,23 +36,40 @@
     <% if (success) { %>
       <div class="success"><%= success %></div>
     <% } %>
-    <div class="gallery">
+    <div class="gallery" id="gallery">
       <% if (media.length === 0) { %>
         <p>No media uploaded yet.</p>
       <% } %>
       <% media.forEach((item, index) => { %>
-        <div class="media-item">
+        <div class="media-item loading" data-index="<%= index %>">
           <div class="media-content" onclick="openModal(<%= index %>)">
             <% if (item.type.startsWith('image/')) { %>
-              <img src="<%= item.url %>" alt="<%= item.originalname %>" loading="lazy" />
+              <!-- Optimized image loading with Cloudinary transformations -->
+              <div class="media-placeholder">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23666' d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E" alt="placeholder">
+              </div>
+              <img 
+                src="<%= item.thumbnail_url || item.url.replace('/upload/', '/upload/f_auto,q_auto,w_300,h_300,c_fill/') %>" 
+                data-src="<%= item.medium_url || item.url.replace('/upload/', '/upload/f_auto,q_auto,w_600,h_600,c_fill/') %>"
+                data-full="<%= item.full_url || item.url %>"
+                alt="<%= item.originalname %>" 
+                loading="lazy"
+                onload="imageLoaded(this, <%= index %>)"
+                onerror="imageError(this, <%= index %>)"
+                class="optimized-image"
+              />
             <% } else if (item.type === 'video/mp4') { %>
-              <video src="<%= item.url %>" preload="metadata"></video>
+              <div class="media-placeholder">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23666' d='M8 5v14l11-7z'/%3E%3C/svg%3E" alt="video placeholder">
+              </div>
+              <video 
+                src="<%= item.url %>" 
+                preload="metadata" 
+                onloadeddata="videoLoaded(this, <%= index %>)"
+                onerror="videoError(this, <%= index %>)"
+                class="optimized-video"
+              ></video>
             <% } %>
-          </div>
-          <div class="media-actions">
-            <button class="delete-btn" onclick="confirmDelete('<%= item.public_id %>', '<%= item.originalname %>', event)">
-              🗑️ Delete
-            </button>
           </div>
           <div class="meta">
             <div><strong><%= item.originalname %></strong></div>
@@ -53,6 +87,11 @@
       <img id="modalImage" style="display: none;">
       <video id="modalVideo" controls style="display: none;"></video>
       <div class="modal-info" id="modalInfo"></div>
+      <div class="modal-actions" id="modalActions" style="display: none;">
+        <button class="modal-delete-btn" onclick="confirmDeleteFromModal()">
+          🗑️ Delete Media
+        </button>
+      </div>
     </div>
   </div>
 
@@ -70,19 +109,112 @@
   </div>
 
   <script>
-    const mediaData = <%- JSON.stringify(media) %>;
-    let deletePublicId = null;
+    // Performance optimizations
+    'use strict';
     
+    // Cache DOM elements
+    const mediaData = <%- JSON.stringify(media) %>;
+    const gallery = document.getElementById('gallery');
+    const mediaModal = document.getElementById('mediaModal');
+    const deleteModal = document.getElementById('deleteModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalVideo = document.getElementById('modalVideo');
+    const modalInfo = document.getElementById('modalInfo');
+    const deleteFileName = document.getElementById('deleteFileName');
+    
+    let deletePublicId = null;
+    let isModalOpen = false;
+    let loadedImages = new Set();
+    let currentModalIndex = -1;
+    
+    // Optimized image loading functions
+    function imageLoaded(img, index) {
+      const mediaItem = document.querySelector(`[data-index="${index}"]`);
+      if (mediaItem) {
+        mediaItem.classList.add('loaded');
+        loadedImages.add(index);
+        
+        // Remove placeholder
+        const placeholder = mediaItem.querySelector('.media-placeholder');
+        if (placeholder) {
+          placeholder.style.display = 'none';
+        }
+        
+        // Load higher quality image if needed
+        if (window.innerWidth > 768 && img.dataset.src) {
+          const highResImg = new Image();
+          highResImg.onload = function() {
+            img.src = this.src;
+          };
+          highResImg.src = img.dataset.src;
+        }
+      }
+    }
+    
+    function imageError(img, index) {
+      const mediaItem = document.querySelector(`[data-index="${index}"]`);
+      if (mediaItem) {
+        mediaItem.classList.add('loaded');
+        img.style.display = 'none';
+        const placeholder = mediaItem.querySelector('.media-placeholder');
+        if (placeholder) {
+          placeholder.innerHTML = '<span style="color: #999;">Image failed to load</span>';
+        }
+      }
+    }
+    
+    function videoLoaded(video, index) {
+      const mediaItem = document.querySelector(`[data-index="${index}"]`);
+      if (mediaItem) {
+        mediaItem.classList.add('loaded');
+        loadedImages.add(index);
+        
+        // Remove placeholder
+        const placeholder = mediaItem.querySelector('.media-placeholder');
+        if (placeholder) {
+          placeholder.style.display = 'none';
+        }
+      }
+    }
+    
+    function videoError(video, index) {
+      const mediaItem = document.querySelector(`[data-index="${index}"]`);
+      if (mediaItem) {
+        mediaItem.classList.add('loaded');
+        video.style.display = 'none';
+        const placeholder = mediaItem.querySelector('.media-placeholder');
+        if (placeholder) {
+          placeholder.innerHTML = '<span style="color: #999;">Video failed to load</span>';
+        }
+      }
+    }
+    
+    // Debounce function for performance
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+    
+    // Optimized modal functions
     function openModal(index) {
-      const modal = document.getElementById('mediaModal');
-      const modalImage = document.getElementById('modalImage');
-      const modalVideo = document.getElementById('modalVideo');
-      const modalInfo = document.getElementById('modalInfo');
+      if (isModalOpen) return;
       
       const item = mediaData[index];
+      if (!item) return;
+      
+      currentModalIndex = index;
       
       if (item.type.startsWith('image/')) {
-        modalImage.src = item.url;
+        // Use full resolution image in modal
+        const fullImageUrl = item.full_url || item.url.replace('/upload/', '/upload/f_auto,q_auto/');
+        modalImage.src = fullImageUrl;
         modalImage.style.display = 'block';
         modalVideo.style.display = 'none';
       } else if (item.type === 'video/mp4') {
@@ -96,42 +228,58 @@
         Uploaded: ${item.uploadedAt}
       `;
       
-      modal.style.display = 'block';
+      // Show delete button in modal
+      const modalActions = document.getElementById('modalActions');
+      modalActions.style.display = 'block';
       
-      // Prevent body scroll when modal is open
+      mediaModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
+      isModalOpen = true;
     }
     
     function closeModal() {
-      const modal = document.getElementById('mediaModal');
-      const modalVideo = document.getElementById('modalVideo');
-      modal.style.display = 'none';
-      modalVideo.pause();
+      if (!isModalOpen) return;
       
-      // Restore body scroll
+      mediaModal.style.display = 'none';
+      modalVideo.pause();
       document.body.style.overflow = 'auto';
+      isModalOpen = false;
+      currentModalIndex = -1;
+      
+      // Hide delete button
+      const modalActions = document.getElementById('modalActions');
+      modalActions.style.display = 'none';
     }
 
-    function confirmDelete(publicId, fileName, event) {
-      event.stopPropagation(); // Prevent modal from opening
-      deletePublicId = publicId;
-      document.getElementById('deleteFileName').textContent = fileName;
-      document.getElementById('deleteModal').style.display = 'block';
+    function confirmDeleteFromModal() {
+      if (currentModalIndex === -1) return;
       
-      // Prevent body scroll when modal is open
+      const item = mediaData[currentModalIndex];
+      if (!item) return;
+      
+      confirmDelete(item.public_id, item.originalname);
+    }
+
+    function confirmDelete(publicId, fileName) {
+      deletePublicId = publicId;
+      deleteFileName.textContent = fileName;
+      deleteModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
     }
 
     function closeDeleteModal() {
-      document.getElementById('deleteModal').style.display = 'none';
+      deleteModal.style.display = 'none';
       deletePublicId = null;
-      
-      // Restore body scroll
       document.body.style.overflow = 'auto';
     }
 
     async function deleteMedia() {
       if (!deletePublicId) return;
+      
+      const deleteBtn = document.querySelector('.confirm-delete-btn');
+      const originalText = deleteBtn.textContent;
+      deleteBtn.textContent = 'Deleting...';
+      deleteBtn.disabled = true;
       
       try {
         const response = await fetch('/delete', {
@@ -145,32 +293,30 @@
         const result = await response.json();
         
         if (result.success) {
-          // Reload page to show updated gallery
+          // Optimized reload with cache busting
           window.location.reload();
         } else {
           alert('Delete failed: ' + result.error);
         }
       } catch (error) {
         alert('Delete failed: ' + error.message);
-      }
-      
-      closeDeleteModal();
-    }
-    
-    // Close modal when clicking outside
-    window.onclick = function(event) {
-      const mediaModal = document.getElementById('mediaModal');
-      const deleteModal = document.getElementById('deleteModal');
-      
-      if (event.target === mediaModal) {
-        closeModal();
-      }
-      if (event.target === deleteModal) {
+      } finally {
+        deleteBtn.textContent = originalText;
+        deleteBtn.disabled = false;
         closeDeleteModal();
       }
     }
     
-    // Close modal with Escape key
+    // Event delegation for better performance
+    document.addEventListener('click', function(event) {
+      if (event.target === mediaModal) {
+        closeModal();
+      } else if (event.target === deleteModal) {
+        closeDeleteModal();
+      }
+    });
+    
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape') {
         closeModal();
@@ -187,6 +333,79 @@
       }
       lastTouchEnd = now;
     }, false);
+    
+    // Intersection Observer for lazy loading with better performance
+    if ('IntersectionObserver' in window) {
+      const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            if (img.dataset.src && !img.src.includes('cloudinary')) {
+              img.src = img.dataset.src;
+            }
+            observer.unobserve(img);
+          }
+        });
+      }, {
+        rootMargin: '50px 0px', // Start loading 50px before image enters viewport
+        threshold: 0.1
+      });
+      
+      document.querySelectorAll('img[data-src]').forEach(img => {
+        imageObserver.observe(img);
+      });
+    }
+    
+    // Preload images that are likely to be viewed next
+    function preloadNextImages() {
+      const visibleItems = Array.from(document.querySelectorAll('.media-item.loaded'));
+      if (visibleItems.length > 0) {
+        const lastVisibleIndex = parseInt(visibleItems[visibleItems.length - 1].dataset.index);
+        const nextIndex = lastVisibleIndex + 1;
+        
+        if (nextIndex < mediaData.length && !loadedImages.has(nextIndex)) {
+          const nextItem = mediaData[nextIndex];
+          if (nextItem && nextItem.type.startsWith('image/')) {
+            const preloadImg = new Image();
+            preloadImg.src = nextItem.thumbnail_url || nextItem.url.replace('/upload/', '/upload/f_auto,q_auto,w_300,h_300,c_fill/');
+          }
+        }
+      }
+    }
+    
+    // Service Worker registration for caching
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+    
+    // Performance monitoring
+    window.addEventListener('load', () => {
+      if ('performance' in window) {
+        const perfData = performance.getEntriesByType('navigation')[0];
+        console.log('Page load time:', perfData.loadEventEnd - perfData.loadEventStart, 'ms');
+        
+        // Log image loading performance
+        const imageLoadTimes = performance.getEntriesByType('resource')
+          .filter(entry => entry.name.includes('cloudinary') && entry.name.includes('image'))
+          .map(entry => entry.duration);
+        
+        if (imageLoadTimes.length > 0) {
+          console.log('Average image load time:', imageLoadTimes.reduce((a, b) => a + b) / imageLoadTimes.length, 'ms');
+        }
+      }
+    });
+    
+    // Preload next images when scrolling
+    const debouncedPreload = debounce(preloadNextImages, 100);
+    window.addEventListener('scroll', debouncedPreload);
   </script>
 </body>
 </html> 
