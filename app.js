@@ -64,19 +64,16 @@ async function uploadToCloudinary(filePath, mimeType, originalName) {
     resource_type: mimeType.startsWith('video/') ? 'video' : 'image',
     folder: 'personal_gallery',
     eager: mimeType.startsWith('image/') ? [
-      { width: 300, height: 300, crop: 'fill', quality: 'auto', format: 'auto' },
-      { width: 600, height: 600, crop: 'fill', quality: 'auto', format: 'auto' },
-      { width: 1200, height: 1200, crop: 'limit', quality: 'auto', format: 'auto' }
+      { width: 300, height: 300, crop: 'fill', quality: 'auto' },
+      { width: 600, height: 600, crop: 'fill', quality: 'auto' },
+      { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
     ] : undefined,
     eager_async: true,
     eager_notification_url: undefined,
     use_filename: true,
     unique_filename: true,
     overwrite: false,
-    invalidate: true,
-    transformation: mimeType.startsWith('image/') ? [
-      { quality: 'auto', fetch_format: 'auto' }
-    ] : undefined
+    invalidate: true
   };
 
   const result = await cloudinary.uploader.upload(filePath, options);
