@@ -465,7 +465,98 @@ main {
 }
 
 .modal-delete-btn:hover, .modal-delete-btn:active {
-  background: rgba(220, 53, 69, 1);
+  background: #dc3545;
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+}
+
+/* Navigation buttons */
+.nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  opacity: 0.8;
+}
+
+.nav-btn:hover, .nav-btn:active {
+  background: rgba(0, 0, 0, 0.9);
+  transform: translateY(-50%) scale(1.1);
+  opacity: 1;
+}
+
+.prev-btn {
+  left: 20px;
+}
+
+.next-btn {
+  right: 20px;
+}
+
+/* Show navigation buttons more prominently on desktop */
+@media (min-width: 768px) {
+  .nav-btn {
+    opacity: 0.7;
+    width: 60px;
+    height: 60px;
+    font-size: 28px;
+  }
+  
+  .nav-btn:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.85);
+  }
+  
+  .prev-btn {
+    left: 30px;
+  }
+  
+  .next-btn {
+    right: 30px;
+  }
+  
+  /* Show navigation hints on modal hover */
+  .modal:hover .nav-btn {
+    opacity: 0.8;
+  }
+  
+  /* Add subtle border to make buttons more visible */
+  .nav-btn {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  .nav-btn:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* Mobile optimizations for navigation */
+@media (max-width: 767px) {
+  .nav-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+    opacity: 0.8;
+  }
+  
+  .prev-btn {
+    left: 10px;
+  }
+  
+  .next-btn {
+    right: 10px;
+  }
 } 

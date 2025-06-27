@@ -84,6 +84,10 @@
   <div id="mediaModal" class="modal">
     <span class="close" onclick="closeModal()">&times;</span>
     <div class="modal-content">
+      <!-- Navigation buttons -->
+      <button class="nav-btn prev-btn" id="prevBtn" style="display: none;">&lt;</button>
+      <button class="nav-btn next-btn" id="nextBtn" style="display: none;">&gt;</button>
+      
       <img id="modalImage" style="display: none;">
       <video id="modalVideo" controls style="display: none;"></video>
       <div class="modal-info" id="modalInfo"></div>
@@ -204,11 +208,19 @@
     
     // Optimized modal functions
     function openModal(index) {
-      if (isModalOpen) return;
+      console.log('openModal called with index:', index);
+      if (isModalOpen) {
+        console.log('Modal already open, returning');
+        return;
+      }
       
       const item = mediaData[index];
-      if (!item) return;
+      if (!item) {
+        console.log('No item found at index:', index);
+        return;
+      }
       
+      console.log('Opening modal for item:', item.originalname);
       currentModalIndex = index;
       
       if (item.type.startsWith('image/')) {
@@ -228,13 +240,15 @@
         Uploaded: ${item.uploadedAt}
       `;
       
-      // Show delete button in modal
+      // Show delete button and navigation buttons in modal
       const modalActions = document.getElementById('modalActions');
       modalActions.style.display = 'block';
+      updateNavigationButtons();
       
       mediaModal.style.display = 'block';
       document.body.style.overflow = 'hidden';
       isModalOpen = true;
+      console.log('Modal opened successfully');
     }
     
     function closeModal() {
@@ -246,9 +260,13 @@
       isModalOpen = false;
       currentModalIndex = -1;
       
-      // Hide delete button
+      // Hide delete button and navigation buttons
       const modalActions = document.getElementById('modalActions');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
       modalActions.style.display = 'none';
+      prevBtn.style.display = 'none';
+      nextBtn.style.display = 'none';
     }
 
     function confirmDeleteFromModal() {
@@ -321,6 +339,12 @@
       if (event.key === 'Escape') {
         closeModal();
         closeDeleteModal();
+      } else if (isModalOpen) {
+        if (event.key === 'ArrowLeft') {
+          navigateModal(-1);
+        } else if (event.key === 'ArrowRight') {
+          navigateModal(1);
+        }
       }
     });
     
@@ -406,6 +430,102 @@
     // Preload next images when scrolling
     const debouncedPreload = debounce(preloadNextImages, 100);
     window.addEventListener('scroll', debouncedPreload);
+
+    // Add touch event listeners
+    document.addEventListener('touchstart', handleTouchStart, false);
+    document.addEventListener('touchend', handleTouchEnd, false);
+    
+    // Add navigation button event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      
+      console.log('Navigation buttons found:', { prevBtn: !!prevBtn, nextBtn: !!nextBtn });
+      
+      if (prevBtn) {
+        prevBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          console.log('Previous button clicked');
+          navigateModal(-1);
+        });
+      }
+      
+      if (nextBtn) {
+        nextBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          console.log('Next button clicked');
+          navigateModal(1);
+        });
+      }
+    });
+
+    // Navigation functions
+    function navigateModal(direction) {
+      if (currentModalIndex === -1) return;
+      
+      const newIndex = currentModalIndex + direction;
+      if (newIndex >= 0 && newIndex < mediaData.length) {
+        openModal(newIndex);
+      }
+    }
+
+    function updateNavigationButtons() {
+      console.log('updateNavigationButtons called, currentModalIndex:', currentModalIndex);
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      
+      console.log('Buttons found:', { prevBtn: !!prevBtn, nextBtn: !!nextBtn });
+      
+      // For testing - always show buttons
+      prevBtn.style.display = 'block';
+      nextBtn.style.display = 'block';
+      
+      // Show/hide previous button
+      if (currentModalIndex > 0) {
+        console.log('Showing previous button');
+      } else {
+        console.log('Hiding previous button');
+      }
+      
+      // Show/hide next button
+      if (currentModalIndex < mediaData.length - 1) {
+        console.log('Showing next button');
+      } else {
+        console.log('Hiding next button');
+      }
+    }
+
+    // Swipe gesture detection
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let touchStartY = 0;
+    let touchEndY = 0;
+
+    function handleTouchStart(e) {
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }
+
+    function handleTouchEnd(e) {
+      if (!isModalOpen) return;
+      
+      touchEndX = e.changedTouches[0].screenX;
+      touchEndY = e.changedTouches[0].screenY;
+      
+      const diffX = touchStartX - touchEndX;
+      const diffY = touchStartY - touchEndY;
+      
+      // Only handle horizontal swipes (ignore vertical swipes)
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+        if (diffX > 0) {
+          // Swipe left - go to next
+          navigateModal(1);
+        } else {
+          // Swipe right - go to previous
+          navigateModal(-1);
+        }
+      }
+    }
   </script>
 </body>
 </html> 
