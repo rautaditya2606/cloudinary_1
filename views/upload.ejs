@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Media</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Upload Media</h1>
+    <a href="/" class="home-btn">Home</a>
+  </header>
+  <main>
+    <% if (error) { %>
+      <div class="error"><%= error %></div>
+    <% } %>
+    <% if (success) { %>
+      <div class="success"><%= success %></div>
+    <% } %>
+    <form action="/upload" method="POST" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+      <label for="media">Select images or videos (jpg, jpeg, png, mp4):</label>
+      <input type="file" name="media" id="media" accept="image/jpeg,image/png,video/mp4" multiple required />
+      <div id="fileInfo" style="display: none; margin: 0.5rem 0; font-size: 0.9rem; color: #666;"></div>
+      <div class="progress" id="progress" style="display: none;">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div id="uploadStatus" style="display: none; margin: 1rem 0;"></div>
+      <button type="submit" id="submitBtn">Upload Files</button>
+    </form>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById('media');
+    const fileInfo = document.getElementById('fileInfo');
+    const submitBtn = document.getElementById('submitBtn');
+    const progress = document.getElementById('progress');
+    const progressBar = document.getElementById('progressBar');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const form = document.getElementById('uploadForm');
+
+    fileInput.addEventListener('change', function() {
+      const files = Array.from(this.files);
+      if (files.length > 0) {
+        let totalSize = 0;
+        let validFiles = 0;
+        let invalidFiles = 0;
+        
+        const fileDetails = files.map(file => {
+          const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+          totalSize += file.size;
+          const isValidType = ['image/jpeg', 'image/png', 'video/mp4'].includes(file.type);
+          const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB per file
+          
+          if (isValidType && isValidSize) {
+            validFiles++;
+          } else {
+            invalidFiles++;
+          }
+          
+          return {
+            name: file.name,
+            size: sizeMB,
+            type: file.type,
+            valid: isValidType && isValidSize
+          };
+        });
+
+        const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+        
+        fileInfo.innerHTML = `
+          <strong>${files.length} file(s) selected</strong><br>
+          Total size: ${totalSizeMB} MB<br>
+          Valid files: ${validFiles}<br>
+          Invalid files: ${invalidFiles}<br><br>
+          <strong>File details:</strong><br>
+          ${fileDetails.map(file => 
+            `${file.name} (${file.size} MB) - ${file.valid ? '✅ Valid' : '❌ Invalid'}`
+          ).join('<br>')}
+        `;
+        fileInfo.style.display = 'block';
+
+        if (invalidFiles > 0) {
+          fileInfo.innerHTML += '<br><span style="color: #c00;">❌ Some files are invalid (wrong type or >20MB)</span>';
+          submitBtn.disabled = true;
+        } else if (totalSize > 100 * 1024 * 1024) { // 100MB total limit
+          fileInfo.innerHTML += '<br><span style="color: #c00;">❌ Total size too large (max 100MB)</span>';
+          submitBtn.disabled = true;
+        } else {
+          fileInfo.innerHTML += '<br><span style="color: #0a0;">✅ All files valid</span>';
+          submitBtn.disabled = false;
+        }
+      } else {
+        fileInfo.style.display = 'none';
+        submitBtn.disabled = false;
+      }
+    });
+
+    form.addEventListener('submit', function() {
+      const files = fileInput.files;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading...';
+      progress.style.display = 'block';
+      uploadStatus.style.display = 'block';
+      uploadStatus.innerHTML = `<strong>Uploading ${files.length} files...</strong>`;
+      
+      // Simulate progress for multiple files
+      let width = 0;
+      const interval = setInterval(() => {
+        if (width >= 90) {
+          clearInterval(interval);
+        } else {
+          width += Math.random() * 5;
+          progressBar.style.width = width + '%';
+        }
+      }, 300);
+    });
+  </script>
+</body>
+</html> 

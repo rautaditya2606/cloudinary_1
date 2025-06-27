@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Media Gallery</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>My Media Gallery</h1>
+    <a href="/upload" class="upload-btn">Upload Media</a>
+  </header>
+  <main>
+    <% if (success) { %>
+      <div class="success"><%= success %></div>
+    <% } %>
+    <div class="gallery">
+      <% if (media.length === 0) { %>
+        <p>No media uploaded yet.</p>
+      <% } %>
+      <% media.forEach((item, index) => { %>
+        <div class="media-item">
+          <div class="media-content" onclick="openModal(<%= index %>)">
+            <% if (item.type.startsWith('image/')) { %>
+              <img src="<%= item.url %>" alt="<%= item.originalname %>" />
+            <% } else if (item.type === 'video/mp4') { %>
+              <video src="<%= item.url %>" preload="metadata"></video>
+            <% } %>
+          </div>
+          <div class="media-actions">
+            <button class="delete-btn" onclick="confirmDelete('<%= item.public_id %>', '<%= item.originalname %>', event)">
+              🗑️ Delete
+            </button>
+          </div>
+          <div class="meta">
+            <div><strong><%= item.originalname %></strong></div>
+            <span><%= item.uploadedAt %></span>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </main>
+
+  <!-- Modal -->
+  <div id="mediaModal" class="modal">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <div class="modal-content">
+      <img id="modalImage" style="display: none;">
+      <video id="modalVideo" controls style="display: none;"></video>
+      <div class="modal-info" id="modalInfo"></div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="modal">
+    <div class="modal-content delete-modal">
+      <h3>Confirm Delete</h3>
+      <p>Are you sure you want to delete "<span id="deleteFileName"></span>"?</p>
+      <p>This action cannot be undone.</p>
+      <div class="delete-actions">
+        <button class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+        <button class="confirm-delete-btn" onclick="deleteMedia()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const mediaData = <%- JSON.stringify(media) %>;
+    let deletePublicId = null;
+    
+    function openModal(index) {
+      const modal = document.getElementById('mediaModal');
+      const modalImage = document.getElementById('modalImage');
+      const modalVideo = document.getElementById('modalVideo');
+      const modalInfo = document.getElementById('modalInfo');
+      
+      const item = mediaData[index];
+      
+      if (item.type.startsWith('image/')) {
+        modalImage.src = item.url;
+        modalImage.style.display = 'block';
+        modalVideo.style.display = 'none';
+      } else if (item.type === 'video/mp4') {
+        modalVideo.src = item.url;
+        modalVideo.style.display = 'block';
+        modalImage.style.display = 'none';
+      }
+      
+      modalInfo.innerHTML = `
+        <strong>${item.originalname}</strong><br>
+        Uploaded: ${item.uploadedAt}
+      `;
+      
+      modal.style.display = 'block';
+    }
+    
+    function closeModal() {
+      const modal = document.getElementById('mediaModal');
+      const modalVideo = document.getElementById('modalVideo');
+      modal.style.display = 'none';
+      modalVideo.pause();
+    }
+
+    function confirmDelete(publicId, fileName, event) {
+      event.stopPropagation(); // Prevent modal from opening
+      deletePublicId = publicId;
+      document.getElementById('deleteFileName').textContent = fileName;
+      document.getElementById('deleteModal').style.display = 'block';
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').style.display = 'none';
+      deletePublicId = null;
+    }
+
+    async function deleteMedia() {
+      if (!deletePublicId) return;
+      
+      try {
+        const response = await fetch('/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ public_id: deletePublicId })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          // Reload page to show updated gallery
+          window.location.reload();
+        } else {
+          alert('Delete failed: ' + result.error);
+        }
+      } catch (error) {
+        alert('Delete failed: ' + error.message);
+      }
+      
+      closeDeleteModal();
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const mediaModal = document.getElementById('mediaModal');
+      const deleteModal = document.getElementById('deleteModal');
+      
+      if (event.target === mediaModal) {
+        closeModal();
+      }
+      if (event.target === deleteModal) {
+        closeDeleteModal();
+      }
+    }
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeModal();
+        closeDeleteModal();
+      }
+    });
+  </script>
+</body>
+</html> 
